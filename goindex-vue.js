@@ -1,709 +1,936 @@
-self.props = {
-	title: 'gdindex',
-	default_root_id: 'root', // 'root' OR 0AK0dce9h38dOUk9PVA
-  // https://drive.google.com/drive/u/1/folders/0AK0dce9h38dOUk9PVA
-  storage: 'drives', // 'drive' OR 'drives'
-  // 'drive' will set 'default_root_id' as default
-  // 'drives' will list all drives (My Drive & Teamdrives)
-  ui: 'light', // light OR dark OR dark-orange
-  // https://github.com/alx-xlx/goindex/tree/production/themes
-	client_id: '**********.apps.googleusercontent.com',
-	client_secret: '********',
-	refresh_token: '*********',
-	auth: false,       // Add Authentication to your Indexed Drive
-	user: 'root',
-	pass: 'toor',
-	upload: true,    // Ability to Upload Files (Local / Remote)
-	lite: false
+// =======Options START=======
+var authConfig = {
+  siteName: "Pleasure", // 网站名称
+  version: "1.1.2", // 程序版本
+  theme: "acrou",
+  // 强烈推荐使用自己的 client_id 和 client_secret
+  client_id: "202264815644.apps.googleusercontent.com",
+  client_secret: "X4Z3ca8xfWDb1Voo-F9a7ZxJ",
+  refresh_token: "1//0d4wXyh49wqWYCgYIARAAGA0SNwF-L9Ir7ltSdik5DuwwWdoOWltVVMDZsMjUt-0wjHCn8osB4GSeTo-E-VrD__acdargqIgH4HA", // 授权 token
+  /**
+   * 设置要显示的多个云端硬盘；按格式添加多个
+   * [id]: 可以是 团队盘id、子文件夹id、或者"root"（代表个人盘根目录）；
+   * [name]: 显示的名称
+   * [user]: Basic Auth 的用户名
+   * [pass]: Basic Auth 的密码
+   * [protect_file_link]: Basic Auth 是否用于保护文件链接，默认值（不设置时）为 false，即不保护文件链接（方便 直链下载/外部播放 等）
+   * 每个盘的 Basic Auth 都可以单独设置。Basic Auth 默认保护该盘下所有文件夹/子文件夹路径
+   * 【注意】默认不保护文件链接，这样可以方便 直链下载/外部播放;
+   *       如果要保护文件链接，需要将 protect_file_link 设置为 true，此时如果要进行外部播放等操作，需要将 host 替换为 user:pass@host 的 形式
+   * 不需要 Basic Auth 的盘，保持 user 和 pass 同时为空即可。（直接不设置也可以）
+   * 【注意】对于id设置为为子文件夹id的盘将不支持搜索功能（不影响其他盘）。
+   */
+  "roots": [
+	{
+		"id": "0AC51i5BmupUMUk9PVA",
+		"name": "My Drive",
+		"user": "",
+		"pass": "",
+		"protect_file_link": false
+	}
+],
+  default_gd: 0,
+  /**
+   * 文件列表页面每页显示的数量。【推荐设置值为 100 到 1000 之间】；
+   * 如果设置大于1000，会导致请求 drive api 时出错；
+   * 如果设置的值过小，会导致文件列表页面滚动条增量加载（分页加载）失效；
+   * 此值的另一个作用是，如果目录内文件数大于此设置值（即需要多页展示的），将会对首次列目录结果进行缓存。
+   */
+  files_list_page_size: 50,
+  /**
+   * 搜索结果页面每页显示的数量。【推荐设置值为 50 到 1000 之间】；
+   * 如果设置大于1000，会导致请求 drive api 时出错；
+   * 如果设置的值过小，会导致搜索结果页面滚动条增量加载（分页加载）失效；
+   * 此值的大小影响搜索操作的响应速度。
+   */
+  search_result_list_page_size: 50,
+  // 确认有 cors 用途的可以开启
+  enable_cors_file_down: false,
+  /**
+   * 上面的 basic auth 已经包含了盘内全局保护的功能。所以默认不再去认证 .password 文件内的密码;
+   * 如果在全局认证的基础上，仍需要给某些目录单独进行 .password 文件内的密码验证的话，将此选项设置为 true;
+   * 【注意】如果开启了 .password 文件密码验证，每次列目录都会额外增加查询目录内 .password 文件是否存在的开销。
+   */
+  enable_password_file_verify: false,
 };
-(function () {
-  'use strict';
 
+var themeOptions = {
+  cdn: "https://cdn.jsdelivr.net/gh/alx-xlx/goindex",
+  // 主题版本号
+  version: "2.0.8-darkmode-0.1",
+  //可选默认系统语言:en/zh-chs/zh-cht
+  languages: "en",
+  render: {
+    /**
+     * 是否渲染HEAD.md文件
+     * Render HEAD.md file
+     */
+    head_md: false,
+    /**
+     * 是否渲染README.md文件
+     * Render README.md file
+     */
+    readme_md: false,
+    /**
+     * 是否渲染文件/文件夹描述
+     * Render file/folder description or not
+     */
+    desc: false,
+  },
   /**
-   * @param typeMap [Object] Map of MIME type -> Array[extensions]
-   * @param ...
+   * 视频播放器选项
+   * Video player options
    */
-  function Mime() {
-    this._types = Object.create(null);
-    this._extensions = Object.create(null);
-
-    for (var i = 0; i < arguments.length; i++) {
-      this.define(arguments[i]);
-    }
-
-    this.define = this.define.bind(this);
-    this.getType = this.getType.bind(this);
-    this.getExtension = this.getExtension.bind(this);
-  }
-
+  video: {
+    /**
+     * 播放器api（不指定则使用默认播放器）
+     * Player api(Use default player if not specified)
+     */
+    api: "",
+    autoplay: true,
+  },
   /**
-   * Define mimetype -> extension mappings.  Each key is a mime-type that maps
-   * to an array of extensions associated with the type.  The first extension is
-   * used as the default extension for the type.
-   *
-   * e.g. mime.define({'audio/ogg', ['oga', 'ogg', 'spx']});
-   *
-   * If a type declares an extension that has already been defined, an error will
-   * be thrown.  To suppress this error and force the extension to be associated
-   * with the new type, pass `force`=true.  Alternatively, you may prefix the
-   * extension with "*" to map the type to extension, without mapping the
-   * extension to the type.
-   *
-   * e.g. mime.define({'audio/wav', ['wav']}, {'audio/x-wav', ['*wav']});
-   *
-   *
-   * @param map (Object) type definitions
-   * @param force (Boolean) if true, force overriding of existing definitions
+   * 音频播放器选项
+   * Audio player options
    */
-  Mime.prototype.define = function(typeMap, force) {
-    for (var type in typeMap) {
-      var extensions = typeMap[type].map(function(t) {return t.toLowerCase()});
-      type = type.toLowerCase();
+  audio: {},
+};
+// =======Options END=======
 
-      for (var i = 0; i < extensions.length; i++) {
-        var ext = extensions[i];
+/**
+ * global functions
+ */
+const FUNCS = {
+  /**
+   * 转换成针对谷歌搜索词法相对安全的搜索关键词
+   */
+  formatSearchKeyword: function(keyword) {
+    let nothing = "";
+    let space = " ";
+    if (!keyword) return nothing;
+    return keyword
+      .replace(/(!=)|['"=<>/\\:]/g, nothing)
+      .replace(/[,，|(){}]/g, space)
+      .trim();
+  },
+};
 
-        // '*' prefix = not the preferred type for this extension.  So fixup the
-        // extension, and skip it.
-        if (ext[0] == '*') {
-          continue;
-        }
-
-        if (!force && (ext in this._types)) {
-          throw new Error(
-            'Attempt to change mapping for "' + ext +
-            '" extension from "' + this._types[ext] + '" to "' + type +
-            '". Pass `force=true` to allow this, otherwise remove "' + ext +
-            '" from the list of extensions for "' + type + '".'
-          );
-        }
-
-        this._types[ext] = type;
-      }
-
-      // Use first extension as default
-      if (force || !this._extensions[type]) {
-        var ext = extensions[0];
-        this._extensions[type] = (ext[0] != '*') ? ext : ext.substr(1);
-      }
-    }
+/**
+ * global consts
+ * @type {{folder_mime_type: string, default_file_fields: string, gd_root_type: {share_drive: number, user_drive: number, sub_folder: number}}}
+ */
+const CONSTS = new (class {
+  default_file_fields =
+    "parents,id,name,mimeType,modifiedTime,createdTime,fileExtension,size";
+  gd_root_type = {
+    user_drive: 0,
+    share_drive: 1,
+    sub_folder: 2,
   };
-
-  /**
-   * Lookup a mime type based on extension
-   */
-  Mime.prototype.getType = function(path) {
-    path = String(path);
-    var last = path.replace(/^.*[/\\]/, '').toLowerCase();
-    var ext = last.replace(/^.*\./, '').toLowerCase();
-
-    var hasPath = last.length < path.length;
-    var hasDot = ext.length < last.length - 1;
-
-    return (hasDot || !hasPath) && this._types[ext] || null;
-  };
-
-  /**
-   * Return file extension associated with a mime type
-   */
-  Mime.prototype.getExtension = function(type) {
-    type = /^\s*([^;\s]*)/.test(type) && RegExp.$1;
-    return type && this._extensions[type.toLowerCase()] || null;
-  };
-
-  var Mime_1 = Mime;
-
-  var standard = {"application/andrew-inset":["ez"],"application/applixware":["aw"],"application/atom+xml":["atom"],"application/atomcat+xml":["atomcat"],"application/atomsvc+xml":["atomsvc"],"application/bdoc":["bdoc"],"application/ccxml+xml":["ccxml"],"application/cdmi-capability":["cdmia"],"application/cdmi-container":["cdmic"],"application/cdmi-domain":["cdmid"],"application/cdmi-object":["cdmio"],"application/cdmi-queue":["cdmiq"],"application/cu-seeme":["cu"],"application/dash+xml":["mpd"],"application/davmount+xml":["davmount"],"application/docbook+xml":["dbk"],"application/dssc+der":["dssc"],"application/dssc+xml":["xdssc"],"application/ecmascript":["ecma","es"],"application/emma+xml":["emma"],"application/epub+zip":["epub"],"application/exi":["exi"],"application/font-tdpfr":["pfr"],"application/geo+json":["geojson"],"application/gml+xml":["gml"],"application/gpx+xml":["gpx"],"application/gxf":["gxf"],"application/gzip":["gz"],"application/hjson":["hjson"],"application/hyperstudio":["stk"],"application/inkml+xml":["ink","inkml"],"application/ipfix":["ipfix"],"application/java-archive":["jar","war","ear"],"application/java-serialized-object":["ser"],"application/java-vm":["class"],"application/javascript":["js","mjs"],"application/json":["json","map"],"application/json5":["json5"],"application/jsonml+json":["jsonml"],"application/ld+json":["jsonld"],"application/lost+xml":["lostxml"],"application/mac-binhex40":["hqx"],"application/mac-compactpro":["cpt"],"application/mads+xml":["mads"],"application/manifest+json":["webmanifest"],"application/marc":["mrc"],"application/marcxml+xml":["mrcx"],"application/mathematica":["ma","nb","mb"],"application/mathml+xml":["mathml"],"application/mbox":["mbox"],"application/mediaservercontrol+xml":["mscml"],"application/metalink+xml":["metalink"],"application/metalink4+xml":["meta4"],"application/mets+xml":["mets"],"application/mods+xml":["mods"],"application/mp21":["m21","mp21"],"application/mp4":["mp4s","m4p"],"application/msword":["doc","dot"],"application/mxf":["mxf"],"application/n-quads":["nq"],"application/n-triples":["nt"],"application/octet-stream":["bin","dms","lrf","mar","so","dist","distz","pkg","bpk","dump","elc","deploy","exe","dll","deb","dmg","iso","img","msi","msp","msm","buffer"],"application/oda":["oda"],"application/oebps-package+xml":["opf"],"application/ogg":["ogx"],"application/omdoc+xml":["omdoc"],"application/onenote":["onetoc","onetoc2","onetmp","onepkg"],"application/oxps":["oxps"],"application/patch-ops-error+xml":["xer"],"application/pdf":["pdf"],"application/pgp-encrypted":["pgp"],"application/pgp-signature":["asc","sig"],"application/pics-rules":["prf"],"application/pkcs10":["p10"],"application/pkcs7-mime":["p7m","p7c"],"application/pkcs7-signature":["p7s"],"application/pkcs8":["p8"],"application/pkix-attr-cert":["ac"],"application/pkix-cert":["cer"],"application/pkix-crl":["crl"],"application/pkix-pkipath":["pkipath"],"application/pkixcmp":["pki"],"application/pls+xml":["pls"],"application/postscript":["ai","eps","ps"],"application/pskc+xml":["pskcxml"],"application/raml+yaml":["raml"],"application/rdf+xml":["rdf","owl"],"application/reginfo+xml":["rif"],"application/relax-ng-compact-syntax":["rnc"],"application/resource-lists+xml":["rl"],"application/resource-lists-diff+xml":["rld"],"application/rls-services+xml":["rs"],"application/rpki-ghostbusters":["gbr"],"application/rpki-manifest":["mft"],"application/rpki-roa":["roa"],"application/rsd+xml":["rsd"],"application/rss+xml":["rss"],"application/rtf":["rtf"],"application/sbml+xml":["sbml"],"application/scvp-cv-request":["scq"],"application/scvp-cv-response":["scs"],"application/scvp-vp-request":["spq"],"application/scvp-vp-response":["spp"],"application/sdp":["sdp"],"application/set-payment-initiation":["setpay"],"application/set-registration-initiation":["setreg"],"application/shf+xml":["shf"],"application/sieve":["siv","sieve"],"application/smil+xml":["smi","smil"],"application/sparql-query":["rq"],"application/sparql-results+xml":["srx"],"application/srgs":["gram"],"application/srgs+xml":["grxml"],"application/sru+xml":["sru"],"application/ssdl+xml":["ssdl"],"application/ssml+xml":["ssml"],"application/tei+xml":["tei","teicorpus"],"application/thraud+xml":["tfi"],"application/timestamped-data":["tsd"],"application/voicexml+xml":["vxml"],"application/wasm":["wasm"],"application/widget":["wgt"],"application/winhlp":["hlp"],"application/wsdl+xml":["wsdl"],"application/wspolicy+xml":["wspolicy"],"application/xaml+xml":["xaml"],"application/xcap-diff+xml":["xdf"],"application/xenc+xml":["xenc"],"application/xhtml+xml":["xhtml","xht"],"application/xml":["xml","xsl","xsd","rng"],"application/xml-dtd":["dtd"],"application/xop+xml":["xop"],"application/xproc+xml":["xpl"],"application/xslt+xml":["xslt"],"application/xspf+xml":["xspf"],"application/xv+xml":["mxml","xhvml","xvml","xvm"],"application/yang":["yang"],"application/yin+xml":["yin"],"application/zip":["zip"],"audio/3gpp":["*3gpp"],"audio/adpcm":["adp"],"audio/basic":["au","snd"],"audio/midi":["mid","midi","kar","rmi"],"audio/mp3":["*mp3"],"audio/mp4":["m4a","mp4a"],"audio/mpeg":["mpga","mp2","mp2a","mp3","m2a","m3a"],"audio/ogg":["oga","ogg","spx"],"audio/s3m":["s3m"],"audio/silk":["sil"],"audio/wav":["wav"],"audio/wave":["*wav"],"audio/webm":["weba"],"audio/xm":["xm"],"font/collection":["ttc"],"font/otf":["otf"],"font/ttf":["ttf"],"font/woff":["woff"],"font/woff2":["woff2"],"image/aces":["exr"],"image/apng":["apng"],"image/bmp":["bmp"],"image/cgm":["cgm"],"image/dicom-rle":["drle"],"image/emf":["emf"],"image/fits":["fits"],"image/g3fax":["g3"],"image/gif":["gif"],"image/heic":["heic"],"image/heic-sequence":["heics"],"image/heif":["heif"],"image/heif-sequence":["heifs"],"image/ief":["ief"],"image/jls":["jls"],"image/jp2":["jp2","jpg2"],"image/jpeg":["jpeg","jpg","jpe"],"image/jpm":["jpm"],"image/jpx":["jpx","jpf"],"image/jxr":["jxr"],"image/ktx":["ktx"],"image/png":["png"],"image/sgi":["sgi"],"image/svg+xml":["svg","svgz"],"image/t38":["t38"],"image/tiff":["tif","tiff"],"image/tiff-fx":["tfx"],"image/webp":["webp"],"image/wmf":["wmf"],"message/disposition-notification":["disposition-notification"],"message/global":["u8msg"],"message/global-delivery-status":["u8dsn"],"message/global-disposition-notification":["u8mdn"],"message/global-headers":["u8hdr"],"message/rfc822":["eml","mime"],"model/3mf":["3mf"],"model/gltf+json":["gltf"],"model/gltf-binary":["glb"],"model/iges":["igs","iges"],"model/mesh":["msh","mesh","silo"],"model/stl":["stl"],"model/vrml":["wrl","vrml"],"model/x3d+binary":["*x3db","x3dbz"],"model/x3d+fastinfoset":["x3db"],"model/x3d+vrml":["*x3dv","x3dvz"],"model/x3d+xml":["x3d","x3dz"],"model/x3d-vrml":["x3dv"],"text/cache-manifest":["appcache","manifest"],"text/calendar":["ics","ifb"],"text/coffeescript":["coffee","litcoffee"],"text/css":["css"],"text/csv":["csv"],"text/html":["html","htm","shtml"],"text/jade":["jade"],"text/jsx":["jsx"],"text/less":["less"],"text/markdown":["markdown","md"],"text/mathml":["mml"],"text/mdx":["mdx"],"text/n3":["n3"],"text/plain":["txt","text","conf","def","list","log","in","ini"],"text/richtext":["rtx"],"text/rtf":["*rtf"],"text/sgml":["sgml","sgm"],"text/shex":["shex"],"text/slim":["slim","slm"],"text/stylus":["stylus","styl"],"text/tab-separated-values":["tsv"],"text/troff":["t","tr","roff","man","me","ms"],"text/turtle":["ttl"],"text/uri-list":["uri","uris","urls"],"text/vcard":["vcard"],"text/vtt":["vtt"],"text/xml":["*xml"],"text/yaml":["yaml","yml"],"video/3gpp":["3gp","3gpp"],"video/3gpp2":["3g2"],"video/h261":["h261"],"video/h263":["h263"],"video/h264":["h264"],"video/jpeg":["jpgv"],"video/jpm":["*jpm","jpgm"],"video/mj2":["mj2","mjp2"],"video/mp2t":["ts"],"video/mp4":["mp4","mp4v","mpg4"],"video/mpeg":["mpeg","mpg","mpe","m1v","m2v"],"video/ogg":["ogv"],"video/quicktime":["qt","mov"],"video/webm":["webm"]};
-
-  var other = {"application/prs.cww":["cww"],"application/vnd.3gpp.pic-bw-large":["plb"],"application/vnd.3gpp.pic-bw-small":["psb"],"application/vnd.3gpp.pic-bw-var":["pvb"],"application/vnd.3gpp2.tcap":["tcap"],"application/vnd.3m.post-it-notes":["pwn"],"application/vnd.accpac.simply.aso":["aso"],"application/vnd.accpac.simply.imp":["imp"],"application/vnd.acucobol":["acu"],"application/vnd.acucorp":["atc","acutc"],"application/vnd.adobe.air-application-installer-package+zip":["air"],"application/vnd.adobe.formscentral.fcdt":["fcdt"],"application/vnd.adobe.fxp":["fxp","fxpl"],"application/vnd.adobe.xdp+xml":["xdp"],"application/vnd.adobe.xfdf":["xfdf"],"application/vnd.ahead.space":["ahead"],"application/vnd.airzip.filesecure.azf":["azf"],"application/vnd.airzip.filesecure.azs":["azs"],"application/vnd.amazon.ebook":["azw"],"application/vnd.americandynamics.acc":["acc"],"application/vnd.amiga.ami":["ami"],"application/vnd.android.package-archive":["apk"],"application/vnd.anser-web-certificate-issue-initiation":["cii"],"application/vnd.anser-web-funds-transfer-initiation":["fti"],"application/vnd.antix.game-component":["atx"],"application/vnd.apple.installer+xml":["mpkg"],"application/vnd.apple.keynote":["keynote"],"application/vnd.apple.mpegurl":["m3u8"],"application/vnd.apple.numbers":["numbers"],"application/vnd.apple.pages":["pages"],"application/vnd.apple.pkpass":["pkpass"],"application/vnd.aristanetworks.swi":["swi"],"application/vnd.astraea-software.iota":["iota"],"application/vnd.audiograph":["aep"],"application/vnd.blueice.multipass":["mpm"],"application/vnd.bmi":["bmi"],"application/vnd.businessobjects":["rep"],"application/vnd.chemdraw+xml":["cdxml"],"application/vnd.chipnuts.karaoke-mmd":["mmd"],"application/vnd.cinderella":["cdy"],"application/vnd.citationstyles.style+xml":["csl"],"application/vnd.claymore":["cla"],"application/vnd.cloanto.rp9":["rp9"],"application/vnd.clonk.c4group":["c4g","c4d","c4f","c4p","c4u"],"application/vnd.cluetrust.cartomobile-config":["c11amc"],"application/vnd.cluetrust.cartomobile-config-pkg":["c11amz"],"application/vnd.commonspace":["csp"],"application/vnd.contact.cmsg":["cdbcmsg"],"application/vnd.cosmocaller":["cmc"],"application/vnd.crick.clicker":["clkx"],"application/vnd.crick.clicker.keyboard":["clkk"],"application/vnd.crick.clicker.palette":["clkp"],"application/vnd.crick.clicker.template":["clkt"],"application/vnd.crick.clicker.wordbank":["clkw"],"application/vnd.criticaltools.wbs+xml":["wbs"],"application/vnd.ctc-posml":["pml"],"application/vnd.cups-ppd":["ppd"],"application/vnd.curl.car":["car"],"application/vnd.curl.pcurl":["pcurl"],"application/vnd.dart":["dart"],"application/vnd.data-vision.rdz":["rdz"],"application/vnd.dece.data":["uvf","uvvf","uvd","uvvd"],"application/vnd.dece.ttml+xml":["uvt","uvvt"],"application/vnd.dece.unspecified":["uvx","uvvx"],"application/vnd.dece.zip":["uvz","uvvz"],"application/vnd.denovo.fcselayout-link":["fe_launch"],"application/vnd.dna":["dna"],"application/vnd.dolby.mlp":["mlp"],"application/vnd.dpgraph":["dpg"],"application/vnd.dreamfactory":["dfac"],"application/vnd.ds-keypoint":["kpxx"],"application/vnd.dvb.ait":["ait"],"application/vnd.dvb.service":["svc"],"application/vnd.dynageo":["geo"],"application/vnd.ecowin.chart":["mag"],"application/vnd.enliven":["nml"],"application/vnd.epson.esf":["esf"],"application/vnd.epson.msf":["msf"],"application/vnd.epson.quickanime":["qam"],"application/vnd.epson.salt":["slt"],"application/vnd.epson.ssf":["ssf"],"application/vnd.eszigno3+xml":["es3","et3"],"application/vnd.ezpix-album":["ez2"],"application/vnd.ezpix-package":["ez3"],"application/vnd.fdf":["fdf"],"application/vnd.fdsn.mseed":["mseed"],"application/vnd.fdsn.seed":["seed","dataless"],"application/vnd.flographit":["gph"],"application/vnd.fluxtime.clip":["ftc"],"application/vnd.framemaker":["fm","frame","maker","book"],"application/vnd.frogans.fnc":["fnc"],"application/vnd.frogans.ltf":["ltf"],"application/vnd.fsc.weblaunch":["fsc"],"application/vnd.fujitsu.oasys":["oas"],"application/vnd.fujitsu.oasys2":["oa2"],"application/vnd.fujitsu.oasys3":["oa3"],"application/vnd.fujitsu.oasysgp":["fg5"],"application/vnd.fujitsu.oasysprs":["bh2"],"application/vnd.fujixerox.ddd":["ddd"],"application/vnd.fujixerox.docuworks":["xdw"],"application/vnd.fujixerox.docuworks.binder":["xbd"],"application/vnd.fuzzysheet":["fzs"],"application/vnd.genomatix.tuxedo":["txd"],"application/vnd.geogebra.file":["ggb"],"application/vnd.geogebra.tool":["ggt"],"application/vnd.geometry-explorer":["gex","gre"],"application/vnd.geonext":["gxt"],"application/vnd.geoplan":["g2w"],"application/vnd.geospace":["g3w"],"application/vnd.gmx":["gmx"],"application/vnd.google-apps.document":["gdoc"],"application/vnd.google-apps.presentation":["gslides"],"application/vnd.google-apps.spreadsheet":["gsheet"],"application/vnd.google-earth.kml+xml":["kml"],"application/vnd.google-earth.kmz":["kmz"],"application/vnd.grafeq":["gqf","gqs"],"application/vnd.groove-account":["gac"],"application/vnd.groove-help":["ghf"],"application/vnd.groove-identity-message":["gim"],"application/vnd.groove-injector":["grv"],"application/vnd.groove-tool-message":["gtm"],"application/vnd.groove-tool-template":["tpl"],"application/vnd.groove-vcard":["vcg"],"application/vnd.hal+xml":["hal"],"application/vnd.handheld-entertainment+xml":["zmm"],"application/vnd.hbci":["hbci"],"application/vnd.hhe.lesson-player":["les"],"application/vnd.hp-hpgl":["hpgl"],"application/vnd.hp-hpid":["hpid"],"application/vnd.hp-hps":["hps"],"application/vnd.hp-jlyt":["jlt"],"application/vnd.hp-pcl":["pcl"],"application/vnd.hp-pclxl":["pclxl"],"application/vnd.hydrostatix.sof-data":["sfd-hdstx"],"application/vnd.ibm.minipay":["mpy"],"application/vnd.ibm.modcap":["afp","listafp","list3820"],"application/vnd.ibm.rights-management":["irm"],"application/vnd.ibm.secure-container":["sc"],"application/vnd.iccprofile":["icc","icm"],"application/vnd.igloader":["igl"],"application/vnd.immervision-ivp":["ivp"],"application/vnd.immervision-ivu":["ivu"],"application/vnd.insors.igm":["igm"],"application/vnd.intercon.formnet":["xpw","xpx"],"application/vnd.intergeo":["i2g"],"application/vnd.intu.qbo":["qbo"],"application/vnd.intu.qfx":["qfx"],"application/vnd.ipunplugged.rcprofile":["rcprofile"],"application/vnd.irepository.package+xml":["irp"],"application/vnd.is-xpr":["xpr"],"application/vnd.isac.fcs":["fcs"],"application/vnd.jam":["jam"],"application/vnd.jcp.javame.midlet-rms":["rms"],"application/vnd.jisp":["jisp"],"application/vnd.joost.joda-archive":["joda"],"application/vnd.kahootz":["ktz","ktr"],"application/vnd.kde.karbon":["karbon"],"application/vnd.kde.kchart":["chrt"],"application/vnd.kde.kformula":["kfo"],"application/vnd.kde.kivio":["flw"],"application/vnd.kde.kontour":["kon"],"application/vnd.kde.kpresenter":["kpr","kpt"],"application/vnd.kde.kspread":["ksp"],"application/vnd.kde.kword":["kwd","kwt"],"application/vnd.kenameaapp":["htke"],"application/vnd.kidspiration":["kia"],"application/vnd.kinar":["kne","knp"],"application/vnd.koan":["skp","skd","skt","skm"],"application/vnd.kodak-descriptor":["sse"],"application/vnd.las.las+xml":["lasxml"],"application/vnd.llamagraphics.life-balance.desktop":["lbd"],"application/vnd.llamagraphics.life-balance.exchange+xml":["lbe"],"application/vnd.lotus-1-2-3":["123"],"application/vnd.lotus-approach":["apr"],"application/vnd.lotus-freelance":["pre"],"application/vnd.lotus-notes":["nsf"],"application/vnd.lotus-organizer":["org"],"application/vnd.lotus-screencam":["scm"],"application/vnd.lotus-wordpro":["lwp"],"application/vnd.macports.portpkg":["portpkg"],"application/vnd.mcd":["mcd"],"application/vnd.medcalcdata":["mc1"],"application/vnd.mediastation.cdkey":["cdkey"],"application/vnd.mfer":["mwf"],"application/vnd.mfmp":["mfm"],"application/vnd.micrografx.flo":["flo"],"application/vnd.micrografx.igx":["igx"],"application/vnd.mif":["mif"],"application/vnd.mobius.daf":["daf"],"application/vnd.mobius.dis":["dis"],"application/vnd.mobius.mbk":["mbk"],"application/vnd.mobius.mqy":["mqy"],"application/vnd.mobius.msl":["msl"],"application/vnd.mobius.plc":["plc"],"application/vnd.mobius.txf":["txf"],"application/vnd.mophun.application":["mpn"],"application/vnd.mophun.certificate":["mpc"],"application/vnd.mozilla.xul+xml":["xul"],"application/vnd.ms-artgalry":["cil"],"application/vnd.ms-cab-compressed":["cab"],"application/vnd.ms-excel":["xls","xlm","xla","xlc","xlt","xlw"],"application/vnd.ms-excel.addin.macroenabled.12":["xlam"],"application/vnd.ms-excel.sheet.binary.macroenabled.12":["xlsb"],"application/vnd.ms-excel.sheet.macroenabled.12":["xlsm"],"application/vnd.ms-excel.template.macroenabled.12":["xltm"],"application/vnd.ms-fontobject":["eot"],"application/vnd.ms-htmlhelp":["chm"],"application/vnd.ms-ims":["ims"],"application/vnd.ms-lrm":["lrm"],"application/vnd.ms-officetheme":["thmx"],"application/vnd.ms-outlook":["msg"],"application/vnd.ms-pki.seccat":["cat"],"application/vnd.ms-pki.stl":["*stl"],"application/vnd.ms-powerpoint":["ppt","pps","pot"],"application/vnd.ms-powerpoint.addin.macroenabled.12":["ppam"],"application/vnd.ms-powerpoint.presentation.macroenabled.12":["pptm"],"application/vnd.ms-powerpoint.slide.macroenabled.12":["sldm"],"application/vnd.ms-powerpoint.slideshow.macroenabled.12":["ppsm"],"application/vnd.ms-powerpoint.template.macroenabled.12":["potm"],"application/vnd.ms-project":["mpp","mpt"],"application/vnd.ms-word.document.macroenabled.12":["docm"],"application/vnd.ms-word.template.macroenabled.12":["dotm"],"application/vnd.ms-works":["wps","wks","wcm","wdb"],"application/vnd.ms-wpl":["wpl"],"application/vnd.ms-xpsdocument":["xps"],"application/vnd.mseq":["mseq"],"application/vnd.musician":["mus"],"application/vnd.muvee.style":["msty"],"application/vnd.mynfc":["taglet"],"application/vnd.neurolanguage.nlu":["nlu"],"application/vnd.nitf":["ntf","nitf"],"application/vnd.noblenet-directory":["nnd"],"application/vnd.noblenet-sealer":["nns"],"application/vnd.noblenet-web":["nnw"],"application/vnd.nokia.n-gage.data":["ngdat"],"application/vnd.nokia.n-gage.symbian.install":["n-gage"],"application/vnd.nokia.radio-preset":["rpst"],"application/vnd.nokia.radio-presets":["rpss"],"application/vnd.novadigm.edm":["edm"],"application/vnd.novadigm.edx":["edx"],"application/vnd.novadigm.ext":["ext"],"application/vnd.oasis.opendocument.chart":["odc"],"application/vnd.oasis.opendocument.chart-template":["otc"],"application/vnd.oasis.opendocument.database":["odb"],"application/vnd.oasis.opendocument.formula":["odf"],"application/vnd.oasis.opendocument.formula-template":["odft"],"application/vnd.oasis.opendocument.graphics":["odg"],"application/vnd.oasis.opendocument.graphics-template":["otg"],"application/vnd.oasis.opendocument.image":["odi"],"application/vnd.oasis.opendocument.image-template":["oti"],"application/vnd.oasis.opendocument.presentation":["odp"],"application/vnd.oasis.opendocument.presentation-template":["otp"],"application/vnd.oasis.opendocument.spreadsheet":["ods"],"application/vnd.oasis.opendocument.spreadsheet-template":["ots"],"application/vnd.oasis.opendocument.text":["odt"],"application/vnd.oasis.opendocument.text-master":["odm"],"application/vnd.oasis.opendocument.text-template":["ott"],"application/vnd.oasis.opendocument.text-web":["oth"],"application/vnd.olpc-sugar":["xo"],"application/vnd.oma.dd2+xml":["dd2"],"application/vnd.openofficeorg.extension":["oxt"],"application/vnd.openxmlformats-officedocument.presentationml.presentation":["pptx"],"application/vnd.openxmlformats-officedocument.presentationml.slide":["sldx"],"application/vnd.openxmlformats-officedocument.presentationml.slideshow":["ppsx"],"application/vnd.openxmlformats-officedocument.presentationml.template":["potx"],"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":["xlsx"],"application/vnd.openxmlformats-officedocument.spreadsheetml.template":["xltx"],"application/vnd.openxmlformats-officedocument.wordprocessingml.document":["docx"],"application/vnd.openxmlformats-officedocument.wordprocessingml.template":["dotx"],"application/vnd.osgeo.mapguide.package":["mgp"],"application/vnd.osgi.dp":["dp"],"application/vnd.osgi.subsystem":["esa"],"application/vnd.palm":["pdb","pqa","oprc"],"application/vnd.pawaafile":["paw"],"application/vnd.pg.format":["str"],"application/vnd.pg.osasli":["ei6"],"application/vnd.picsel":["efif"],"application/vnd.pmi.widget":["wg"],"application/vnd.pocketlearn":["plf"],"application/vnd.powerbuilder6":["pbd"],"application/vnd.previewsystems.box":["box"],"application/vnd.proteus.magazine":["mgz"],"application/vnd.publishare-delta-tree":["qps"],"application/vnd.pvi.ptid1":["ptid"],"application/vnd.quark.quarkxpress":["qxd","qxt","qwd","qwt","qxl","qxb"],"application/vnd.realvnc.bed":["bed"],"application/vnd.recordare.musicxml":["mxl"],"application/vnd.recordare.musicxml+xml":["musicxml"],"application/vnd.rig.cryptonote":["cryptonote"],"application/vnd.rim.cod":["cod"],"application/vnd.rn-realmedia":["rm"],"application/vnd.rn-realmedia-vbr":["rmvb"],"application/vnd.route66.link66+xml":["link66"],"application/vnd.sailingtracker.track":["st"],"application/vnd.seemail":["see"],"application/vnd.sema":["sema"],"application/vnd.semd":["semd"],"application/vnd.semf":["semf"],"application/vnd.shana.informed.formdata":["ifm"],"application/vnd.shana.informed.formtemplate":["itp"],"application/vnd.shana.informed.interchange":["iif"],"application/vnd.shana.informed.package":["ipk"],"application/vnd.simtech-mindmapper":["twd","twds"],"application/vnd.smaf":["mmf"],"application/vnd.smart.teacher":["teacher"],"application/vnd.solent.sdkm+xml":["sdkm","sdkd"],"application/vnd.spotfire.dxp":["dxp"],"application/vnd.spotfire.sfs":["sfs"],"application/vnd.stardivision.calc":["sdc"],"application/vnd.stardivision.draw":["sda"],"application/vnd.stardivision.impress":["sdd"],"application/vnd.stardivision.math":["smf"],"application/vnd.stardivision.writer":["sdw","vor"],"application/vnd.stardivision.writer-global":["sgl"],"application/vnd.stepmania.package":["smzip"],"application/vnd.stepmania.stepchart":["sm"],"application/vnd.sun.wadl+xml":["wadl"],"application/vnd.sun.xml.calc":["sxc"],"application/vnd.sun.xml.calc.template":["stc"],"application/vnd.sun.xml.draw":["sxd"],"application/vnd.sun.xml.draw.template":["std"],"application/vnd.sun.xml.impress":["sxi"],"application/vnd.sun.xml.impress.template":["sti"],"application/vnd.sun.xml.math":["sxm"],"application/vnd.sun.xml.writer":["sxw"],"application/vnd.sun.xml.writer.global":["sxg"],"application/vnd.sun.xml.writer.template":["stw"],"application/vnd.sus-calendar":["sus","susp"],"application/vnd.svd":["svd"],"application/vnd.symbian.install":["sis","sisx"],"application/vnd.syncml+xml":["xsm"],"application/vnd.syncml.dm+wbxml":["bdm"],"application/vnd.syncml.dm+xml":["xdm"],"application/vnd.tao.intent-module-archive":["tao"],"application/vnd.tcpdump.pcap":["pcap","cap","dmp"],"application/vnd.tmobile-livetv":["tmo"],"application/vnd.trid.tpt":["tpt"],"application/vnd.triscape.mxs":["mxs"],"application/vnd.trueapp":["tra"],"application/vnd.ufdl":["ufd","ufdl"],"application/vnd.uiq.theme":["utz"],"application/vnd.umajin":["umj"],"application/vnd.unity":["unityweb"],"application/vnd.uoml+xml":["uoml"],"application/vnd.vcx":["vcx"],"application/vnd.visio":["vsd","vst","vss","vsw"],"application/vnd.visionary":["vis"],"application/vnd.vsf":["vsf"],"application/vnd.wap.wbxml":["wbxml"],"application/vnd.wap.wmlc":["wmlc"],"application/vnd.wap.wmlscriptc":["wmlsc"],"application/vnd.webturbo":["wtb"],"application/vnd.wolfram.player":["nbp"],"application/vnd.wordperfect":["wpd"],"application/vnd.wqd":["wqd"],"application/vnd.wt.stf":["stf"],"application/vnd.xara":["xar"],"application/vnd.xfdl":["xfdl"],"application/vnd.yamaha.hv-dic":["hvd"],"application/vnd.yamaha.hv-script":["hvs"],"application/vnd.yamaha.hv-voice":["hvp"],"application/vnd.yamaha.openscoreformat":["osf"],"application/vnd.yamaha.openscoreformat.osfpvg+xml":["osfpvg"],"application/vnd.yamaha.smaf-audio":["saf"],"application/vnd.yamaha.smaf-phrase":["spf"],"application/vnd.yellowriver-custom-menu":["cmp"],"application/vnd.zul":["zir","zirz"],"application/vnd.zzazz.deck+xml":["zaz"],"application/x-7z-compressed":["7z"],"application/x-abiword":["abw"],"application/x-ace-compressed":["ace"],"application/x-apple-diskimage":["*dmg"],"application/x-arj":["arj"],"application/x-authorware-bin":["aab","x32","u32","vox"],"application/x-authorware-map":["aam"],"application/x-authorware-seg":["aas"],"application/x-bcpio":["bcpio"],"application/x-bdoc":["*bdoc"],"application/x-bittorrent":["torrent"],"application/x-blorb":["blb","blorb"],"application/x-bzip":["bz"],"application/x-bzip2":["bz2","boz"],"application/x-cbr":["cbr","cba","cbt","cbz","cb7"],"application/x-cdlink":["vcd"],"application/x-cfs-compressed":["cfs"],"application/x-chat":["chat"],"application/x-chess-pgn":["pgn"],"application/x-chrome-extension":["crx"],"application/x-cocoa":["cco"],"application/x-conference":["nsc"],"application/x-cpio":["cpio"],"application/x-csh":["csh"],"application/x-debian-package":["*deb","udeb"],"application/x-dgc-compressed":["dgc"],"application/x-director":["dir","dcr","dxr","cst","cct","cxt","w3d","fgd","swa"],"application/x-doom":["wad"],"application/x-dtbncx+xml":["ncx"],"application/x-dtbook+xml":["dtb"],"application/x-dtbresource+xml":["res"],"application/x-dvi":["dvi"],"application/x-envoy":["evy"],"application/x-eva":["eva"],"application/x-font-bdf":["bdf"],"application/x-font-ghostscript":["gsf"],"application/x-font-linux-psf":["psf"],"application/x-font-pcf":["pcf"],"application/x-font-snf":["snf"],"application/x-font-type1":["pfa","pfb","pfm","afm"],"application/x-freearc":["arc"],"application/x-futuresplash":["spl"],"application/x-gca-compressed":["gca"],"application/x-glulx":["ulx"],"application/x-gnumeric":["gnumeric"],"application/x-gramps-xml":["gramps"],"application/x-gtar":["gtar"],"application/x-hdf":["hdf"],"application/x-httpd-php":["php"],"application/x-install-instructions":["install"],"application/x-iso9660-image":["*iso"],"application/x-java-archive-diff":["jardiff"],"application/x-java-jnlp-file":["jnlp"],"application/x-latex":["latex"],"application/x-lua-bytecode":["luac"],"application/x-lzh-compressed":["lzh","lha"],"application/x-makeself":["run"],"application/x-mie":["mie"],"application/x-mobipocket-ebook":["prc","mobi"],"application/x-ms-application":["application"],"application/x-ms-shortcut":["lnk"],"application/x-ms-wmd":["wmd"],"application/x-ms-wmz":["wmz"],"application/x-ms-xbap":["xbap"],"application/x-msaccess":["mdb"],"application/x-msbinder":["obd"],"application/x-mscardfile":["crd"],"application/x-msclip":["clp"],"application/x-msdos-program":["*exe"],"application/x-msdownload":["*exe","*dll","com","bat","*msi"],"application/x-msmediaview":["mvb","m13","m14"],"application/x-msmetafile":["*wmf","*wmz","*emf","emz"],"application/x-msmoney":["mny"],"application/x-mspublisher":["pub"],"application/x-msschedule":["scd"],"application/x-msterminal":["trm"],"application/x-mswrite":["wri"],"application/x-netcdf":["nc","cdf"],"application/x-ns-proxy-autoconfig":["pac"],"application/x-nzb":["nzb"],"application/x-perl":["pl","pm"],"application/x-pilot":["*prc","*pdb"],"application/x-pkcs12":["p12","pfx"],"application/x-pkcs7-certificates":["p7b","spc"],"application/x-pkcs7-certreqresp":["p7r"],"application/x-rar-compressed":["rar"],"application/x-redhat-package-manager":["rpm"],"application/x-research-info-systems":["ris"],"application/x-sea":["sea"],"application/x-sh":["sh"],"application/x-shar":["shar"],"application/x-shockwave-flash":["swf"],"application/x-silverlight-app":["xap"],"application/x-sql":["sql"],"application/x-stuffit":["sit"],"application/x-stuffitx":["sitx"],"application/x-subrip":["srt"],"application/x-sv4cpio":["sv4cpio"],"application/x-sv4crc":["sv4crc"],"application/x-t3vm-image":["t3"],"application/x-tads":["gam"],"application/x-tar":["tar"],"application/x-tcl":["tcl","tk"],"application/x-tex":["tex"],"application/x-tex-tfm":["tfm"],"application/x-texinfo":["texinfo","texi"],"application/x-tgif":["obj"],"application/x-ustar":["ustar"],"application/x-virtualbox-hdd":["hdd"],"application/x-virtualbox-ova":["ova"],"application/x-virtualbox-ovf":["ovf"],"application/x-virtualbox-vbox":["vbox"],"application/x-virtualbox-vbox-extpack":["vbox-extpack"],"application/x-virtualbox-vdi":["vdi"],"application/x-virtualbox-vhd":["vhd"],"application/x-virtualbox-vmdk":["vmdk"],"application/x-wais-source":["src"],"application/x-web-app-manifest+json":["webapp"],"application/x-x509-ca-cert":["der","crt","pem"],"application/x-xfig":["fig"],"application/x-xliff+xml":["xlf"],"application/x-xpinstall":["xpi"],"application/x-xz":["xz"],"application/x-zmachine":["z1","z2","z3","z4","z5","z6","z7","z8"],"audio/vnd.dece.audio":["uva","uvva"],"audio/vnd.digital-winds":["eol"],"audio/vnd.dra":["dra"],"audio/vnd.dts":["dts"],"audio/vnd.dts.hd":["dtshd"],"audio/vnd.lucent.voice":["lvp"],"audio/vnd.ms-playready.media.pya":["pya"],"audio/vnd.nuera.ecelp4800":["ecelp4800"],"audio/vnd.nuera.ecelp7470":["ecelp7470"],"audio/vnd.nuera.ecelp9600":["ecelp9600"],"audio/vnd.rip":["rip"],"audio/x-aac":["aac"],"audio/x-aiff":["aif","aiff","aifc"],"audio/x-caf":["caf"],"audio/x-flac":["flac"],"audio/x-m4a":["*m4a"],"audio/x-matroska":["mka"],"audio/x-mpegurl":["m3u"],"audio/x-ms-wax":["wax"],"audio/x-ms-wma":["wma"],"audio/x-pn-realaudio":["ram","ra"],"audio/x-pn-realaudio-plugin":["rmp"],"audio/x-realaudio":["*ra"],"audio/x-wav":["*wav"],"chemical/x-cdx":["cdx"],"chemical/x-cif":["cif"],"chemical/x-cmdf":["cmdf"],"chemical/x-cml":["cml"],"chemical/x-csml":["csml"],"chemical/x-xyz":["xyz"],"image/prs.btif":["btif"],"image/prs.pti":["pti"],"image/vnd.adobe.photoshop":["psd"],"image/vnd.airzip.accelerator.azv":["azv"],"image/vnd.dece.graphic":["uvi","uvvi","uvg","uvvg"],"image/vnd.djvu":["djvu","djv"],"image/vnd.dvb.subtitle":["*sub"],"image/vnd.dwg":["dwg"],"image/vnd.dxf":["dxf"],"image/vnd.fastbidsheet":["fbs"],"image/vnd.fpx":["fpx"],"image/vnd.fst":["fst"],"image/vnd.fujixerox.edmics-mmr":["mmr"],"image/vnd.fujixerox.edmics-rlc":["rlc"],"image/vnd.microsoft.icon":["ico"],"image/vnd.ms-modi":["mdi"],"image/vnd.ms-photo":["wdp"],"image/vnd.net-fpx":["npx"],"image/vnd.tencent.tap":["tap"],"image/vnd.valve.source.texture":["vtf"],"image/vnd.wap.wbmp":["wbmp"],"image/vnd.xiff":["xif"],"image/vnd.zbrush.pcx":["pcx"],"image/x-3ds":["3ds"],"image/x-cmu-raster":["ras"],"image/x-cmx":["cmx"],"image/x-freehand":["fh","fhc","fh4","fh5","fh7"],"image/x-icon":["*ico"],"image/x-jng":["jng"],"image/x-mrsid-image":["sid"],"image/x-ms-bmp":["*bmp"],"image/x-pcx":["*pcx"],"image/x-pict":["pic","pct"],"image/x-portable-anymap":["pnm"],"image/x-portable-bitmap":["pbm"],"image/x-portable-graymap":["pgm"],"image/x-portable-pixmap":["ppm"],"image/x-rgb":["rgb"],"image/x-tga":["tga"],"image/x-xbitmap":["xbm"],"image/x-xpixmap":["xpm"],"image/x-xwindowdump":["xwd"],"message/vnd.wfa.wsc":["wsc"],"model/vnd.collada+xml":["dae"],"model/vnd.dwf":["dwf"],"model/vnd.gdl":["gdl"],"model/vnd.gtw":["gtw"],"model/vnd.mts":["mts"],"model/vnd.opengex":["ogex"],"model/vnd.parasolid.transmit.binary":["x_b"],"model/vnd.parasolid.transmit.text":["x_t"],"model/vnd.usdz+zip":["usdz"],"model/vnd.valve.source.compiled-map":["bsp"],"model/vnd.vtu":["vtu"],"text/prs.lines.tag":["dsc"],"text/vnd.curl":["curl"],"text/vnd.curl.dcurl":["dcurl"],"text/vnd.curl.mcurl":["mcurl"],"text/vnd.curl.scurl":["scurl"],"text/vnd.dvb.subtitle":["sub"],"text/vnd.fly":["fly"],"text/vnd.fmi.flexstor":["flx"],"text/vnd.graphviz":["gv"],"text/vnd.in3d.3dml":["3dml"],"text/vnd.in3d.spot":["spot"],"text/vnd.sun.j2me.app-descriptor":["jad"],"text/vnd.wap.wml":["wml"],"text/vnd.wap.wmlscript":["wmls"],"text/x-asm":["s","asm"],"text/x-c":["c","cc","cxx","cpp","h","hh","dic"],"text/x-component":["htc"],"text/x-fortran":["f","for","f77","f90"],"text/x-handlebars-template":["hbs"],"text/x-java-source":["java"],"text/x-lua":["lua"],"text/x-markdown":["mkd"],"text/x-nfo":["nfo"],"text/x-opml":["opml"],"text/x-org":["*org"],"text/x-pascal":["p","pas"],"text/x-processing":["pde"],"text/x-sass":["sass"],"text/x-scss":["scss"],"text/x-setext":["etx"],"text/x-sfv":["sfv"],"text/x-suse-ymp":["ymp"],"text/x-uuencode":["uu"],"text/x-vcalendar":["vcs"],"text/x-vcard":["vcf"],"video/vnd.dece.hd":["uvh","uvvh"],"video/vnd.dece.mobile":["uvm","uvvm"],"video/vnd.dece.pd":["uvp","uvvp"],"video/vnd.dece.sd":["uvs","uvvs"],"video/vnd.dece.video":["uvv","uvvv"],"video/vnd.dvb.file":["dvb"],"video/vnd.fvt":["fvt"],"video/vnd.mpegurl":["mxu","m4u"],"video/vnd.ms-playready.media.pyv":["pyv"],"video/vnd.uvvu.mp4":["uvu","uvvu"],"video/vnd.vivo":["viv"],"video/x-f4v":["f4v"],"video/x-fli":["fli"],"video/x-flv":["flv"],"video/x-m4v":["m4v"],"video/x-matroska":["mkv","mk3d","mks"],"video/x-mng":["mng"],"video/x-ms-asf":["asf","asx"],"video/x-ms-vob":["vob"],"video/x-ms-wm":["wm"],"video/x-ms-wmv":["wmv"],"video/x-ms-wmx":["wmx"],"video/x-ms-wvx":["wvx"],"video/x-msvideo":["avi"],"video/x-sgi-movie":["movie"],"video/x-smv":["smv"],"x-conference/x-cooltalk":["ice"]};
-
-  var mime = new Mime_1(standard, other);
-
-  /*
-   * XFetch.js modified
-   * A extremely simple fetch extension inspired by sindresorhus/ky.
-   */
-  const xf = (() => {
-    const METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head'];
-
-    class HTTPError extends Error {
-      constructor(res) {
-        super(res.statusText);
-        this.name = 'HTTPError';
-        this.response = res;
-      }
-
-    }
-
-    class XResponsePromise extends Promise {}
-
-    for (const alias of ['arrayBuffer', 'blob', 'formData', 'json', 'text']) {
-      // alias for .json() .text() etc...
-      XResponsePromise.prototype[alias] = function (fn) {
-        return this.then(res => res[alias]()).then(fn || (x => x));
-      };
-    }
-
-    const {
-      assign
-    } = Object;
-
-    function mergeDeep(target, source) {
-      const isObject = obj => obj && typeof obj === 'object';
-
-      if (!isObject(target) || !isObject(source)) {
-        return source;
-      }
-
-      Object.keys(source).forEach(key => {
-        const targetValue = target[key];
-        const sourceValue = source[key];
-
-        if (Array.isArray(targetValue) && Array.isArray(sourceValue)) {
-          target[key] = targetValue.concat(sourceValue);
-        } else if (isObject(targetValue) && isObject(sourceValue)) {
-          target[key] = mergeDeep(Object.assign({}, targetValue), sourceValue);
-        } else {
-          target[key] = sourceValue;
-        }
-      });
-      return target;
-    }
-
-    const fromEntries = ent => ent.reduce((acc, [k, v]) => (acc[k] = v, acc), {});
-
-    const typeis = (...types) => val => types.some(type => typeof type === 'string' ? typeof val === type : val instanceof type);
-
-    const isstr = typeis('string');
-    const isobj = typeis('object');
-
-    const isstrorobj = v => isstr(v) || isobj(v);
-
-    const responseErrorThrower = res => {
-      if (!res.ok) throw new HTTPError(res);
-      return res;
-    };
-
-    const extend = (defaultInit = {}) => {
-      const xfetch = (input, init = {}) => {
-        mergeDeep(init, defaultInit);
-
-        const createQueryString = o => new init.URLSearchParams(o).toString();
-
-        const parseQueryString = s => fromEntries([...new init.URLSearchParams(s).entries()]);
-
-        const url = new init.URL(input, init.baseURI || undefined);
-
-        if (!init.headers) {
-          init.headers = {};
-        } else if (typeis(init.Headers)(init.headers)) {
-          // Transform into object if it is `Headers`
-          init.headers = fromEntries([...init.headers.entries()]);
-        } // Add json or form on body
-
-
-        if (init.json) {
-          init.body = JSON.stringify(init.json);
-          init.headers['Content-Type'] = 'application/json';
-        } else if (isstrorobj(init.urlencoded)) {
-          init.body = isstr(init.urlencoded) ? init.urlencoded : createQueryString(init.urlencoded);
-          init.headers['Content-Type'] = 'application/x-www-form-urlencoded';
-        } else if (typeis(init.FormData, 'object')(init.formData)) {
-          // init.formData is data passed by user, init.FormData is FormData constructor
-          if (!typeis(init.FormData)(init.formData)) {
-            const fd = new init.FormData();
-
-            for (const [k, v] of Object.entries(init.formData)) {
-              fd.append(k, v);
-            }
-
-            init.formData = fd;
-          }
-
-          init.body = init.formData;
-        } // Querystring
-
-
-        if (init.qs) {
-          if (isstr(init.qs)) init.qs = parseQueryString(init.qs);
-          url.search = createQueryString(assign(fromEntries([...url.searchParams.entries()]), init.qs));
-        }
-
-        return XResponsePromise.resolve(init.fetch(url, init).then(responseErrorThrower));
-      };
-
-      for (const method of METHODS) {
-        xfetch[method] = (input, init = {}) => {
-          init.method = method.toUpperCase();
-          return xfetch(input, init);
-        };
-      } // Extra methods and classes
-
-
-      xfetch.extend = newDefaultInit => extend(assign({}, defaultInit, newDefaultInit));
-
-      xfetch.HTTPError = HTTPError;
-      return xfetch;
-    };
-
-    const isWindow = typeof document !== 'undefined';
-    const isBrowser = typeof self !== 'undefined'; // works in both window & worker scope
-
-    return isBrowser ? extend({
-      fetch: fetch.bind(self),
-      URL,
-      Response,
-      URLSearchParams,
-      Headers,
-      FormData,
-      baseURI: isWindow ? document.baseURI : '' // since there is no document in webworkers
-
-    }) : extend();
-  })();
-
-  class GoogleDrive {
-    constructor(auth) {
-      this.auth = auth;
-      this.expires = 0;
-      this._getIdCache = new Map();
-    }
-
-    async initializeClient() {
-      // any method that do api call must call this beforehand
-      if (Date.now() < this.expires) return;
-      const resp = await xf.post('https://www.googleapis.com/oauth2/v4/token', {
-        urlencoded: {
-          client_id: this.auth.client_id,
-          client_secret: this.auth.client_secret,
-          refresh_token: this.auth.refresh_token,
-          grant_type: 'refresh_token'
-        }
-      }).json();
-      this.client = xf.extend({
-        baseURI: 'https://www.googleapis.com/drive/v3/',
-        headers: {
-          Authorization: `Bearer ${resp.access_token}`
-        }
-      });
-      this.expires = Date.now() + 3500 * 1000; // normally, it should expiers after 3600 seconds
-    }
-
-    async listDrive() {
-      await this.initializeClient();
-      return this.client.get(`${self.props.storage}`).json();
-    }
-
-    async download(id, range = '') {
-      await this.initializeClient();
-      return this.client.get(`files/${id}`, {
-        qs: {
-          includeItemsFromAllDrives: true,
-          supportsAllDrives: true,
-          alt: 'media'
-        },
-        headers: {
-          Range: range
-        }
-      });
-    }
-
-    async downloadByPath(path, rootId = 'root', range = '') {
-      const id = await this.getId(path, rootId);
-      if (!id) return null;
-      return this.download(id, range);
-    }
-
-    async getMeta(id) {
-      await this.initializeClient();
-      return this.client.get(`files/${id}`, {
-        qs: {
-          includeItemsFromAllDrives: true,
-          supportsAllDrives: true,
-          fields: '*'
-        }
-      }).json();
-    }
-
-    async getMetaByPath(path, rootId = 'root') {
-      const id = await this.getId(path, rootId);
-      if (!id) return null;
-      return this.getMeta(id);
-    }
-
-    async listFolder(id) {
-      await this.initializeClient();
-
-      const getList = pageToken => {
-        const qs = {
-          includeItemsFromAllDrives: true,
-          supportsAllDrives: true,
-          q: `'${id}' in parents and trashed = false`,
-          orderBy: 'folder,name,modifiedTime desc',
-          fields: 'files(id,name,mimeType,size,modifiedTime),nextPageToken',
-          pageSize: 1000
-        };
-
-        if (pageToken) {
-          qs.pageToken = pageToken;
-        }
-
-        return this.client.get('files', {
-          qs
-        }).json();
-      };
-
-      const files = [];
-      let pageToken;
-
-      do {
-        const resp = await getList(pageToken);
-        files.push(...resp.files);
-        pageToken = resp.nextPageToken;
-      } while (pageToken);
-
-      return {
-        files
-      };
-    }
-
-    async listFolderByPath(path, rootId = 'root') {
-      const id = await this.getId(path, rootId);
-      if (!id) return null;
-      return this.listFolder(id);
-    }
-
-    async getId(path, rootId = 'root') {
-      const toks = path.split('/').filter(Boolean);
-      let id = rootId;
-
-      for (const tok of toks) {
-        id = await this._getId(id, tok);
-      }
-
-      return id;
-    }
-
-    async _getId(parentId, childName) {
-      if (this._getIdCache.has(parentId + childName)) {
-        return this._getIdCache.get(parentId + childName);
-      }
-
-      await this.initializeClient();
-      childName = childName.replace(/\'/g, `\\'`); // escape single quote
-
-      const resp = await this.client.get('files', {
-        qs: {
-          includeItemsFromAllDrives: true,
-          supportsAllDrives: true,
-          q: `'${parentId}' in parents and name = '${childName}'  and trashed = false`,
-          fields: 'files(id)'
-        }
-      }).json().catch(e => ({
-        files: []
-      })); // if error, make it empty
-
-      if (resp.files.length === 0) {
-        return null;
-      }
-
-      this._getIdCache.has(parentId + childName);
-
-      return resp.files[0].id; // when there are more than 1 items, simply return the first one
-    }
-
-    async upload(parentId, name, file) {
-      await this.initializeClient();
-      const createResp = await this.client.post('https://www.googleapis.com/upload/drive/v3/files', {
-        qs: {
-          uploadType: 'resumable',
-          supportsAllDrives: true
-        },
-        json: {
-          name,
-          parents: [parentId]
-        }
-      });
-      const putUrl = createResp.headers.get('Location');
-      return this.client.put(putUrl, {
-        body: file
-      }).json();
-    }
-
-    async uploadByPath(path, name, file, rootId = 'root') {
-      const id = await this.getId(path, rootId);
-      if (!id) return null;
-      return this.upload(id, name, file);
-    }
-
-    async delete(fileId) {
-      return this.client.delete(`files/${fileId}`);
-    }
-
-    async deleteByPath(path, rootId = 'root') {
-      const id = await this.getId(path, rootId);
-      if (!id) return null;
-      return this.delete(id);
-    }
-
-  }
-
-  const gd = new GoogleDrive(self.props);
-  const HTML = `<!DOCTYPE html><html lang=en><head><meta charset=utf-8><meta http-equiv=X-UA-Compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1"><title>${self.props.title}</title><link href="/~_~_goindex/resources/css/app.css" rel=stylesheet></head><body><script>window.props = { title: '${self.props.title}', default_root_id: '${self.props.default_root_id}', api: location.protocol + '//' + location.host, upload: ${self.props.upload} }<\/script><div id=app></div><script src="/~_~_goindex/resources/js/app.js"><\/script></body></html>`;
-
-  async function onGet(request) {
-    let {
-      pathname: path
-    } = request;
-    const rootId = request.searchParams.get('rootId') || self.props.default_root_id;
-
-    if (path.startsWith('/~_~_goindex/resources/')) {
-      const remain = path.replace('/~_~_goindex/resources/', '');
-      const r = await fetch(`https://raw.githubusercontent.com/alx-xlx/goindex/production/themes/material-vue-${self.props.ui}/${remain}`);
-      return new Response(r.body, {
-        headers: {
-          'Content-Type': mime.getType(remain) + '; charset=utf-8',
-          'Cache-Control': 'max-age=600'
-        }
-      });
-    } else if (path === '/~_~_goindex/drives') {
-      return new Response(JSON.stringify((await gd.listDrive())), {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-    } else if (path.substr(-1) === '/' || path.startsWith('/~viewer')) {
-      return new Response(HTML, {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8'
-        }
-      });
-    } else {
-      const result = await gd.getMetaByPath(path, rootId);
-
-      if (!result) {
-        return new Response('null', {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          status: 404
-        });
-      }
-
-      const isGoogleApps = result.mimeType.includes('vnd.google-apps');
-
-      if (!isGoogleApps) {
-        const r = await gd.download(result.id, request.headers.get('Range'));
-        const h = new Headers(r.headers);
-        h.set('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(result.name)}`);
-        return new Response(r.body, {
-          status: r.status,
-          headers: h
-        });
-      } else {
-        return Response.redirect(result.webViewLink, 302);
-      }
-    }
-  }
-
-  async function onPost(request) {
-    let {
-      pathname: path
-    } = request;
-    const rootId = request.searchParams.get('rootId') || self.props.default_root_id;
-
-    if (path.substr(-1) === '/') {
-      return new Response(JSON.stringify((await gd.listFolderByPath(path, rootId))), {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-    } else {
-      const result = await gd.getMetaByPath(path, rootId);
-
-      if (!result) {
-        return new Response('null', {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          status: 404
-        });
-      }
-
-      const isGoogleApps = result.mimeType.includes('vnd.google-apps');
-
-      if (!isGoogleApps) {
-        const r = await gd.download(result.id, request.headers.get('Range'));
-        const h = new Headers(r.headers);
-        h.set('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(result.name)}`);
-        return new Response(r.body, {
-          status: r.status,
-          headers: h
-        });
-      } else {
-        return Response.redirect(result.webViewLink, 302);
-      }
-    }
-  }
-
-  async function onPut(request) {
-    let {
-      pathname: path
-    } = request;
-
-    if (path.substr(-1) === '/') {
-      return new Response(null, {
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        status: 405
-      });
-    }
-
-    const url = request.searchParams.get('url');
-    let fileBody;
-
-    if (url) {
-      const u = new URL(url);
-      const Referer = u.href;
-      const Origin = u.protocol + '//' + u.host;
-      fileBody = (await fetch(url, {
-        headers: {
-          Referer,
-          Origin
-        }
-      })).body;
-    } else {
-      fileBody = request.body;
-    }
-
-    const tok = path.split('/');
-    const name = tok.pop();
-    const parent = tok.join('/');
-    const rootId = request.searchParams.get('rootId') || self.props.default_root_id;
-    return new Response(JSON.stringify((await gd.uploadByPath(parent, name, fileBody, rootId))), {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-  }
-
-  function unauthorized() {
-    return new Response('Unauthorized', {
-      headers: {
-        'WWW-Authenticate': 'Basic realm="goindex"',
-        'Access-Control-Allow-Origin': '*'
-      },
-      status: 401
-    });
-  }
-
-  function parseBasicAuth(auth) {
-    try {
-      return atob(auth.split(' ').pop()).split(':');
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function doBasicAuth(request) {
-    const auth = request.headers.get('Authorization');
-
-    if (!auth || !/^Basic [A-Za-z0-9._~+/-]+=*$/i.test(auth)) {
-      return false;
-    }
-
-    const [user, pass] = parseBasicAuth(auth);
-    return user === self.props.user && pass === self.props.pass;
-  }
-
-  function encodePathComponent(path) {
-    return path.split('/').map(encodeURIComponent).join('/');
-  }
-
-  async function handleRequest(request) {
-    if (request.method === 'OPTIONS') // allow preflight request
-      return new Response('', {
-        status: 200,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, HEAD, OPTIONS'
-        }
-      });
-
-    if (self.props.auth && !doBasicAuth(request)) {
-      return unauthorized();
-    }
-
-    request = Object.assign({}, request, new URL(request.url));
-    request.pathname = request.pathname.split('/').map(decodeURIComponent).map(decodeURIComponent) // for some super special cases, browser will force encode it...   eg: +αあるふぁきゅん。 - +♂.mp3
-    .join('/');
-
-    if (self.props.lite && request.pathname.endsWith('/')) {
-      // lite mode
-      const path = request.pathname;
-      let parent = encodePathComponent(path.split('/').slice(0, -2).join('/') + '/');
-      const {
-        files
-      } = await gd.listFolderByPath(path, self.props.default_root_id);
-      let fileht = '';
-
-      for (const f of files) {
-        const isf = f.mimeType === 'application/vnd.google-apps.folder';
-        const p = encodePathComponent(path + f.name);
-        fileht += `<li><a href="${p + (isf ? '/' : '')}">${f.name}</a></li>`;
-      }
-
-      const ht = `<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+  folder_mime_type = "application/vnd.google-apps.folder";
+})();
+
+// gd instances
+var gds = [];
+
+function html(current_drive_order = 0, model = {}) {
+  return `
+<!DOCTYPE html>
 <html>
 <head>
-<title>Index of ${path}</title>
+<meta charset="utf-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0,maximum-scale=1.0, user-scalable=no"/> <title>${authConfig.siteName}</title> <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1"><meta name="description" content="Combining the power of Cloudflare Workers and Google Drive will allow you to index your files on the browser on Cloudflare Workers."><meta name="theme-color" content="#FF3300"><meta name="application-name" content="goindex"><meta name="robots" content="index, follow"><meta name="twitter:card" content="summary"><meta name="twitter:image" content="https://i.imgur.com/rOyuGjA.gif"><meta name="twitter:description" content="Combining the power of Cloudflare Workers and Google Drive will allow you to index your files on the browser on Cloudflare Workers."><meta name="keywords" content="goindex, google, drive, goindex, gdindex, classic, material, workers-script, oauth-consent-screen, google-drive, cloudflare-workers, themes"><meta name="twitter:title" content="Goindex"><meta name="twitter:url" content="https://github.com/alx-xlx/goindex"><link rel="shortcut icon" href="https://i.imgur.com/rOyuGjA.gif"><meta property="og:site_name" content="Goindex"><meta property="og:type" content="website"><meta property="og:image" content="https://i.imgur.com/rOyuGjA.gif"><meta property="og:description" content="Combining the power of Cloudflare Workers and Google Drive will allow you to index your files on the browser on Cloudflare Workers."><meta property="og:title" content="Goindex"><meta property="og:url" content="https://github.com/alx-xlx/goindex"><link rel="apple-touch-icon" href="https://i.imgur.com/rOyuGjA.gif"><link rel="icon" type="image/png" sizes="32x32" href="https://i.imgur.com/rOyuGjA.gif"><meta name="google-site-verification" content="OD_AXMYw-V6ID9xQUb2Wien9Yy8IJSyfBUyejYNB3CU"/><script async src="https://www.googletagmanager.com/gtag/js?id=UA-86099016-6"></script><script>window.dataLayer=window.dataLayer || []; function gtag(){dataLayer.push(arguments);}gtag('js', new Date()); gtag('config', 'UA-86099016-6');</script><script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-MR47R4M');</script> <style>@import url(${themeOptions.cdn}@${themeOptions.version}/goindex-acrou/dist/style.min.css); </style> <script>window.gdconfig=JSON.parse('${JSON.stringify({version: authConfig.version, themeOptions: themeOptions,})}'); window.themeOptions=JSON.parse('${JSON.stringify(themeOptions)}'); window.gds=JSON.parse('${JSON.stringify( authConfig.roots.map((it)=> it.name) )}'); window.MODEL=JSON.parse('${JSON.stringify(model)}'); window.current_drive_order=${current_drive_order}; </script>
 </head>
 <body>
-<h1>Index of ${path}</h1>
-<ul>
-<li><a href="${parent}"> Parent Directory</a></li>
-${fileht}
-</ul>
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MR47R4M"height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <div id="app"></div>
+    <script src="${themeOptions.cdn}@${
+    themeOptions.version
+  }/goindex-acrou/dist/app.min.js"></script>
 </body>
-</html>`;
-      return new Response(ht, {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8'
-        }
-      });
-    }
+</html>
+`;
+}
 
-    let resp;
-    if (request.method === 'GET') resp = await onGet(request);else if (request.method === 'POST') resp = await onPost(request);else if (request.method === 'PUT') resp = await onPut(request);else resp = new Response('', {
-      status: 405
+addEventListener("fetch", (event) => {
+  event.respondWith(handleRequest(event.request));
+});
+
+/**
+ * Fetch and log a request
+ * @param {Request} request
+ */
+async function handleRequest(request) {
+  if (gds.length === 0) {
+    for (let i = 0; i < authConfig.roots.length; i++) {
+      const gd = new googleDrive(authConfig, i);
+      await gd.init();
+      gds.push(gd);
+    }
+    // 这个操作并行，提高效率
+    let tasks = [];
+    gds.forEach((gd) => {
+      tasks.push(gd.initRootType());
     });
-    const obj = Object.create(null);
-
-    for (const [k, v] of resp.headers.entries()) {
-      obj[k] = v;
+    for (let task of tasks) {
+      await task;
     }
+  }
 
-    return new Response(resp.body, {
-      status: resp.status,
-      statusText: resp.statusText,
-      headers: Object.assign(obj, {
-        'Access-Control-Allow-Origin': '*'
-      })
+  // 从 path 中提取 drive order
+  // 并根据 drive order 获取对应的 gd instance
+  let gd;
+  let url = new URL(request.url);
+  let path = decodeURI(url.pathname);
+
+  /**
+   * 重定向至起始页
+   * @returns {Response}
+   */
+  function redirectToIndexPage() {
+    return new Response("", {
+      status: 301,
+      headers: { Location: `/${authConfig.default_gd}:/` },
     });
   }
 
-  addEventListener('fetch', event => {
-    event.respondWith(handleRequest(event.request).catch(err => {
-      console.error(err);
-      new Response(JSON.stringify(err.stack), {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-    }));
-  });
+  if (path == "/") return redirectToIndexPage();
+  if (path.toLowerCase() == "/favicon.ico") {
+    // 后面可以找一个 favicon
+    return new Response("", { status: 404 });
+  }
 
-}());
+  // 特殊命令格式
+  const command_reg = /^\/(?<num>\d+):(?<command>[a-zA-Z0-9]+)(\/.*)?$/g;
+  const match = command_reg.exec(path);
+  let command;
+  if (match) {
+    const num = match.groups.num;
+    const order = Number(num);
+    if (order >= 0 && order < gds.length) {
+      gd = gds[order];
+    } else {
+      return redirectToIndexPage();
+    }
+    // basic auth
+    for (const r = gd.basicAuthResponse(request); r; ) return r;
+    command = match.groups.command;
+
+    // 搜索
+    if (command === "search") {
+      if (request.method === "POST") {
+        // 搜索结果
+        return handleSearch(request, gd);
+      } else {
+        const params = url.searchParams;
+        // 搜索页面
+        return new Response(
+          html(gd.order, {
+            q: params.get("q") || "",
+            is_search_page: true,
+            root_type: gd.root_type,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "text/html; charset=utf-8" },
+          }
+        );
+      }
+    } else if (command === "id2path" && request.method === "POST") {
+      return handleId2Path(request, gd);
+    } else if (command === "view") {
+      const params = url.searchParams;
+      return gd.view(params.get("url"), request.headers.get("Range"));
+    } else if (command !== "down" && request.method === "GET") {
+      return new Response(html(gd.order, { root_type: gd.root_type }), {
+        status: 200,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+  }
+  const reg = new RegExp(`^(/\\d+:)${command}/`, "g");
+  path = path.replace(reg, (p1, p2) => {
+    return p2 + "/";
+  });
+  // 期望的 path 格式
+  const common_reg = /^\/\d+:\/.*$/g;
+  try {
+    if (!path.match(common_reg)) {
+      return redirectToIndexPage();
+    }
+    let split = path.split("/");
+    let order = Number(split[1].slice(0, -1));
+    if (order >= 0 && order < gds.length) {
+      gd = gds[order];
+    } else {
+      return redirectToIndexPage();
+    }
+  } catch (e) {
+    return redirectToIndexPage();
+  }
+
+  // basic auth
+  // for (const r = gd.basicAuthResponse(request); r;) return r;
+  const basic_auth_res = gd.basicAuthResponse(request);
+  path = path.replace(gd.url_path_prefix, "") || "/";
+  if (request.method == "POST") {
+    return basic_auth_res || apiRequest(request, gd);
+  }
+
+  let action = url.searchParams.get("a");
+
+  if (path.substr(-1) == "/" || action != null) {
+    return (
+      basic_auth_res ||
+      new Response(html(gd.order, { root_type: gd.root_type }), {
+        status: 200,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      })
+    );
+  } else {
+    if (
+      path
+        .split("/")
+        .pop()
+        .toLowerCase() == ".password"
+    ) {
+      return basic_auth_res || new Response("", { status: 404 });
+    }
+    let file = await gd.file(path);
+    let range = request.headers.get("Range");
+    if (gd.root.protect_file_link && basic_auth_res) return basic_auth_res;
+    const is_down = !(command && command == "down");
+    return gd.down(file.id, range, is_down);
+  }
+}
+
+async function apiRequest(request, gd) {
+  let url = new URL(request.url);
+  let path = url.pathname;
+  path = path.replace(gd.url_path_prefix, "") || "/";
+
+  let option = { status: 200, headers: { "Access-Control-Allow-Origin": "*" } };
+
+  if (path.substr(-1) == "/") {
+    let deferred_pass = gd.password(path);
+    let body = await request.text();
+    body = JSON.parse(body);
+    // 这样可以提升首次列目录时的速度。缺点是，如果password验证失败，也依然会产生列目录的开销
+    let deferred_list_result = gd.list(
+      path,
+      body.page_token,
+      Number(body.page_index)
+    );
+
+    // check .password file, if `enable_password_file_verify` is true
+    if (authConfig["enable_password_file_verify"]) {
+      let password = await gd.password(path);
+      // console.log("dir password", password);
+      if (password && password.replace("\n", "") !== body.password) {
+        let html = `{"error": {"code": 401,"message": "password error."}}`;
+        return new Response(html, option);
+      }
+    }
+
+    let list_result = await deferred_list_result;
+    return new Response(JSON.stringify(list_result), option);
+  } else {
+    let file = await gd.file(path);
+    let range = request.headers.get("Range");
+    return new Response(JSON.stringify(file));
+  }
+}
+
+// 处理 search
+async function handleSearch(request, gd) {
+  const option = {
+    status: 200,
+    headers: { "Access-Control-Allow-Origin": "*" },
+  };
+  let body = await request.text();
+  body = JSON.parse(body);
+  let search_result = await gd.search(
+    body.q || "",
+    body.page_token,
+    Number(body.page_index)
+  );
+  return new Response(JSON.stringify(search_result), option);
+}
+
+/**
+ * 处理 id2path
+ * @param request 需要 id 参数
+ * @param gd
+ * @returns {Promise<Response>} 【注意】如果从前台接收的id代表的项目不在目标gd盘下，那么response会返回给前台一个空字符串""
+ */
+async function handleId2Path(request, gd) {
+  const option = {
+    status: 200,
+    headers: { "Access-Control-Allow-Origin": "*" },
+  };
+  let body = await request.text();
+  body = JSON.parse(body);
+  let path = await gd.findPathById(body.id);
+  return new Response(path || "", option);
+}
+
+class googleDrive {
+  constructor(authConfig, order) {
+    // 每个盘对应一个order，对应一个gd实例
+    this.order = order;
+    this.root = authConfig.roots[order];
+    this.root.protect_file_link = this.root.protect_file_link || false;
+    this.url_path_prefix = `/${order}:`;
+    this.authConfig = authConfig;
+    // TODO: 这些缓存的失效刷新策略，后期可以制定一下
+    // path id
+    this.paths = [];
+    // path file
+    this.files = [];
+    // path pass
+    this.passwords = [];
+    // id <-> path
+    this.id_path_cache = {};
+    this.id_path_cache[this.root["id"]] = "/";
+    this.paths["/"] = this.root["id"];
+    /*if (this.root['pass'] != "") {
+            this.passwords['/'] = this.root['pass'];
+        }*/
+    // this.init();
+  }
+
+  /**
+   * 初次授权；然后获取 user_drive_real_root_id
+   * @returns {Promise<void>}
+   */
+  async init() {
+    await this.accessToken();
+    /*await (async () => {
+            // 只获取1次
+            if (authConfig.user_drive_real_root_id) return;
+            const root_obj = await (gds[0] || this).findItemById('root');
+            if (root_obj && root_obj.id) {
+                authConfig.user_drive_real_root_id = root_obj.id
+            }
+        })();*/
+    // 等待 user_drive_real_root_id ，只获取1次
+    if (authConfig.user_drive_real_root_id) return;
+    const root_obj = await (gds[0] || this).findItemById("root");
+    if (root_obj && root_obj.id) {
+      authConfig.user_drive_real_root_id = root_obj.id;
+    }
+  }
+
+  /**
+   * 获取根目录类型，设置到 root_type
+   * @returns {Promise<void>}
+   */
+  async initRootType() {
+    const root_id = this.root["id"];
+    const types = CONSTS.gd_root_type;
+    if (root_id === "root" || root_id === authConfig.user_drive_real_root_id) {
+      this.root_type = types.user_drive;
+    } else {
+      const obj = await this.getShareDriveObjById(root_id);
+      this.root_type = obj ? types.share_drive : types.sub_folder;
+    }
+  }
+
+  /**
+   * Returns a response that requires authorization, or null
+   * @param request
+   * @returns {Response|null}
+   */
+  basicAuthResponse(request) {
+    const user = this.root.user || "",
+      pass = this.root.pass || "",
+      _401 = new Response("Unauthorized", {
+        headers: {
+          "WWW-Authenticate": `Basic realm="goindex:drive:${this.order}"`,
+        },
+        status: 401,
+      });
+    if (user || pass) {
+      const auth = request.headers.get("Authorization");
+      if (auth) {
+        try {
+          const [received_user, received_pass] = atob(
+            auth.split(" ").pop()
+          ).split(":");
+          return received_user === user && received_pass === pass ? null : _401;
+        } catch (e) {}
+      }
+    } else return null;
+    return _401;
+  }
+
+  async view(url, range = "", inline = true) {
+    let requestOption = await this.requestOption();
+    requestOption.headers["Range"] = range;
+    let res = await fetch(url, requestOption);
+    const { headers } = (res = new Response(res.body, res));
+    this.authConfig.enable_cors_file_down &&
+      headers.append("Access-Control-Allow-Origin", "*");
+    inline === true && headers.set("Content-Disposition", "inline");
+    return res;
+  }
+
+  async down(id, range = "", inline = false) {
+    let url = `https://www.googleapis.com/drive/v3/files/${id}?alt=media`;
+    let requestOption = await this.requestOption();
+    requestOption.headers["Range"] = range;
+    let res = await fetch(url, requestOption);
+    const { headers } = (res = new Response(res.body, res));
+    this.authConfig.enable_cors_file_down &&
+      headers.append("Access-Control-Allow-Origin", "*");
+    inline === true && headers.set("Content-Disposition", "inline");
+    return res;
+  }
+
+  async file(path) {
+    if (typeof this.files[path] == "undefined") {
+      this.files[path] = await this._file(path);
+    }
+    return this.files[path];
+  }
+
+  async _file(path) {
+    let arr = path.split("/");
+    let name = arr.pop();
+    name = decodeURIComponent(name).replace(/\'/g, "\\'");
+    let dir = arr.join("/") + "/";
+    // console.log(name, dir);
+    let parent = await this.findPathId(dir);
+    // console.log(parent);
+    let url = "https://www.googleapis.com/drive/v3/files";
+    let params = { includeItemsFromAllDrives: true, supportsAllDrives: true };
+    params.q = `'${parent}' in parents and name = '${name}' and trashed = false`;
+    params.fields =
+      "files(id, name, mimeType, size ,createdTime, modifiedTime, iconLink, thumbnailLink)";
+    url += "?" + this.enQuery(params);
+    let requestOption = await this.requestOption();
+    let response = await fetch(url, requestOption);
+    let obj = await response.json();
+    // console.log(obj);
+    return obj.files[0];
+  }
+
+  // 通过reqeust cache 来缓存
+  async list(path, page_token = null, page_index = 0) {
+    if (this.path_children_cache == undefined) {
+      // { <path> :[ {nextPageToken:'',data:{}}, {nextPageToken:'',data:{}} ...], ...}
+      this.path_children_cache = {};
+    }
+
+    if (
+      this.path_children_cache[path] &&
+      this.path_children_cache[path][page_index] &&
+      this.path_children_cache[path][page_index].data
+    ) {
+      let child_obj = this.path_children_cache[path][page_index];
+      return {
+        nextPageToken: child_obj.nextPageToken || null,
+        curPageIndex: page_index,
+        data: child_obj.data,
+      };
+    }
+
+    let id = await this.findPathId(path);
+    let result = await this._ls(id, page_token, page_index);
+    let data = result.data;
+    // 对有多页的，进行缓存
+    if (result.nextPageToken && data.files) {
+      if (!Array.isArray(this.path_children_cache[path])) {
+        this.path_children_cache[path] = [];
+      }
+      this.path_children_cache[path][Number(result.curPageIndex)] = {
+        nextPageToken: result.nextPageToken,
+        data: data,
+      };
+    }
+
+    return result;
+  }
+
+  async _ls(parent, page_token = null, page_index = 0) {
+    // console.log("_ls", parent);
+
+    if (parent == undefined) {
+      return null;
+    }
+    let obj;
+    let params = { includeItemsFromAllDrives: true, supportsAllDrives: true };
+    params.q = `'${parent}' in parents and trashed = false AND name !='.password'`;
+    params.orderBy = "folder,name,modifiedTime desc";
+    params.fields =
+      "nextPageToken, files(id, name, mimeType, size , modifiedTime, thumbnailLink, description)";
+    params.pageSize = this.authConfig.files_list_page_size;
+
+    if (page_token) {
+      params.pageToken = page_token;
+    }
+    let url = "https://www.googleapis.com/drive/v3/files";
+    url += "?" + this.enQuery(params);
+    let requestOption = await this.requestOption();
+    let response = await fetch(url, requestOption);
+    obj = await response.json();
+
+    return {
+      nextPageToken: obj.nextPageToken || null,
+      curPageIndex: page_index,
+      data: obj,
+    };
+
+    /*do {
+            if (pageToken) {
+                params.pageToken = pageToken;
+            }
+            let url = 'https://www.googleapis.com/drive/v3/files';
+            url += '?' + this.enQuery(params);
+            let requestOption = await this.requestOption();
+            let response = await fetch(url, requestOption);
+            obj = await response.json();
+            files.push(...obj.files);
+            pageToken = obj.nextPageToken;
+        } while (pageToken);*/
+  }
+
+  async password(path) {
+    if (this.passwords[path] !== undefined) {
+      return this.passwords[path];
+    }
+
+    // console.log("load", path, ".password", this.passwords[path]);
+
+    let file = await this.file(path + ".password");
+    if (file == undefined) {
+      this.passwords[path] = null;
+    } else {
+      let url = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+      let requestOption = await this.requestOption();
+      let response = await this.fetch200(url, requestOption);
+      this.passwords[path] = await response.text();
+    }
+
+    return this.passwords[path];
+  }
+
+  /**
+   * 通过 id 获取 share drive 信息
+   * @param any_id
+   * @returns {Promise<null|{id}|any>} 任何非正常情况都返回 null
+   */
+  async getShareDriveObjById(any_id) {
+    if (!any_id) return null;
+    if ("string" !== typeof any_id) return null;
+
+    let url = `https://www.googleapis.com/drive/v3/drives/${any_id}`;
+    let requestOption = await this.requestOption();
+    let res = await fetch(url, requestOption);
+    let obj = await res.json();
+    if (obj && obj.id) return obj;
+
+    return null;
+  }
+
+  /**
+   * 搜索
+   * @returns {Promise<{data: null, nextPageToken: null, curPageIndex: number}>}
+   */
+  async search(origin_keyword, page_token = null, page_index = 0) {
+    const types = CONSTS.gd_root_type;
+    const is_user_drive = this.root_type === types.user_drive;
+    const is_share_drive = this.root_type === types.share_drive;
+
+    const empty_result = {
+      nextPageToken: null,
+      curPageIndex: page_index,
+      data: null,
+    };
+
+    if (!is_user_drive && !is_share_drive) {
+      return empty_result;
+    }
+    let keyword = FUNCS.formatSearchKeyword(origin_keyword);
+    if (!keyword) {
+      // 关键词为空，返回
+      return empty_result;
+    }
+    let words = keyword.split(/\s+/);
+    let name_search_str = `name contains '${words.join(
+      "' AND name contains '"
+    )}'`;
+
+    // corpora 为 user 是个人盘 ，为 drive 是团队盘。配合 driveId
+    let params = {};
+    if (is_user_drive) {
+      params.corpora = "user";
+    }
+    if (is_share_drive) {
+      params.corpora = "drive";
+      params.driveId = this.root.id;
+      // This parameter will only be effective until June 1, 2020. Afterwards shared drive items will be included in the results.
+      params.includeItemsFromAllDrives = true;
+      params.supportsAllDrives = true;
+    }
+    if (page_token) {
+      params.pageToken = page_token;
+    }
+    params.q = `trashed = false AND name !='.password' AND (${name_search_str})`;
+    params.fields =
+      "nextPageToken, files(id, name, mimeType, size , modifiedTime, thumbnailLink, description)";
+    params.pageSize = this.authConfig.search_result_list_page_size;
+    // params.orderBy = 'folder,name,modifiedTime desc';
+
+    let url = "https://www.googleapis.com/drive/v3/files";
+    url += "?" + this.enQuery(params);
+    // console.log(params)
+    let requestOption = await this.requestOption();
+    let response = await fetch(url, requestOption);
+    let res_obj = await response.json();
+
+    return {
+      nextPageToken: res_obj.nextPageToken || null,
+      curPageIndex: page_index,
+      data: res_obj,
+    };
+  }
+
+  /**
+   * 一层一层的向上获取这个文件或文件夹的上级文件夹的 file 对象。注意：会很慢！！！
+   * 最多向上寻找到当前 gd 对象的根目录 (root id)
+   * 只考虑一条单独的向上链。
+   * 【注意】如果此id代表的项目不在目标gd盘下，那么此函数会返回null
+   *
+   * @param child_id
+   * @param contain_myself
+   * @returns {Promise<[]>}
+   */
+  async findParentFilesRecursion(child_id, contain_myself = true) {
+    const gd = this;
+    const gd_root_id = gd.root.id;
+    const user_drive_real_root_id = authConfig.user_drive_real_root_id;
+    const is_user_drive = gd.root_type === CONSTS.gd_root_type.user_drive;
+
+    // 自下向上查询的终点目标id
+    const target_top_id = is_user_drive ? user_drive_real_root_id : gd_root_id;
+    const fields = CONSTS.default_file_fields;
+
+    // [{},{},...]
+    const parent_files = [];
+    let meet_top = false;
+
+    async function addItsFirstParent(file_obj) {
+      if (!file_obj) return;
+      if (!file_obj.parents) return;
+      if (file_obj.parents.length < 1) return;
+
+      // ['','',...]
+      let p_ids = file_obj.parents;
+      if (p_ids && p_ids.length > 0) {
+        // its first parent
+        const first_p_id = p_ids[0];
+        if (first_p_id === target_top_id) {
+          meet_top = true;
+          return;
+        }
+        const p_file_obj = await gd.findItemById(first_p_id);
+        if (p_file_obj && p_file_obj.id) {
+          parent_files.push(p_file_obj);
+          await addItsFirstParent(p_file_obj);
+        }
+      }
+    }
+
+    const child_obj = await gd.findItemById(child_id);
+    if (contain_myself) {
+      parent_files.push(child_obj);
+    }
+    await addItsFirstParent(child_obj);
+
+    return meet_top ? parent_files : null;
+  }
+
+  /**
+   * 获取相对于本盘根目录的path
+   * @param child_id
+   * @returns {Promise<string>} 【注意】如果此id代表的项目不在目标gd盘下，那么此方法会返回空字符串""
+   */
+  async findPathById(child_id) {
+    if (this.id_path_cache[child_id]) {
+      return this.id_path_cache[child_id];
+    }
+
+    const p_files = await this.findParentFilesRecursion(child_id);
+    if (!p_files || p_files.length < 1) return "";
+
+    let cache = [];
+    // 把查出来的每一级的path和id都缓存一下
+    p_files.forEach((value, idx) => {
+      const is_folder =
+        idx === 0 ? p_files[idx].mimeType === CONSTS.folder_mime_type : true;
+      let path =
+        "/" +
+        p_files
+          .slice(idx)
+          .map((it) => it.name)
+          .reverse()
+          .join("/");
+      if (is_folder) path += "/";
+      cache.push({ id: p_files[idx].id, path: path });
+    });
+
+    cache.forEach((obj) => {
+      this.id_path_cache[obj.id] = obj.path;
+      this.paths[obj.path] = obj.id;
+    });
+
+    /*const is_folder = p_files[0].mimeType === CONSTS.folder_mime_type;
+        let path = '/' + p_files.map(it => it.name).reverse().join('/');
+        if (is_folder) path += '/';*/
+
+    return cache[0].path;
+  }
+
+  // 根据id获取file item
+  async findItemById(id) {
+    const is_user_drive = this.root_type === CONSTS.gd_root_type.user_drive;
+    let url = `https://www.googleapis.com/drive/v3/files/${id}?fields=${
+      CONSTS.default_file_fields
+    }${is_user_drive ? "" : "&supportsAllDrives=true"}`;
+    let requestOption = await this.requestOption();
+    let res = await fetch(url, requestOption);
+    return await res.json();
+  }
+
+  async findPathId(path) {
+    let c_path = "/";
+    let c_id = this.paths[c_path];
+
+    let arr = path.trim("/").split("/");
+    for (let name of arr) {
+      c_path += name + "/";
+
+      if (typeof this.paths[c_path] == "undefined") {
+        let id = await this._findDirId(c_id, name);
+        this.paths[c_path] = id;
+      }
+
+      c_id = this.paths[c_path];
+      if (c_id == undefined || c_id == null) {
+        break;
+      }
+    }
+    // console.log(this.paths);
+    return this.paths[path];
+  }
+
+  async _findDirId(parent, name) {
+    name = decodeURIComponent(name).replace(/\'/g, "\\'");
+
+    // console.log("_findDirId", parent, name);
+
+    if (parent == undefined) {
+      return null;
+    }
+
+    let url = "https://www.googleapis.com/drive/v3/files";
+    let params = { includeItemsFromAllDrives: true, supportsAllDrives: true };
+    params.q = `'${parent}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${name}'  and trashed = false`;
+    params.fields = "nextPageToken, files(id, name, mimeType)";
+    url += "?" + this.enQuery(params);
+    let requestOption = await this.requestOption();
+    let response = await fetch(url, requestOption);
+    let obj = await response.json();
+    if (obj.files[0] == undefined) {
+      return null;
+    }
+    return obj.files[0].id;
+  }
+
+  async accessToken() {
+    console.log("accessToken");
+    if (
+      this.authConfig.expires == undefined ||
+      this.authConfig.expires < Date.now()
+    ) {
+      const obj = await this.fetchAccessToken();
+      if (obj.access_token != undefined) {
+        this.authConfig.accessToken = obj.access_token;
+        this.authConfig.expires = Date.now() + 3500 * 1000;
+      }
+    }
+    return this.authConfig.accessToken;
+  }
+
+  async fetchAccessToken() {
+    console.log("fetchAccessToken");
+    const url = "https://www.googleapis.com/oauth2/v4/token";
+    const headers = {
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+    const post_data = {
+      client_id: this.authConfig.client_id,
+      client_secret: this.authConfig.client_secret,
+      refresh_token: this.authConfig.refresh_token,
+      grant_type: "refresh_token",
+    };
+
+    let requestOption = {
+      method: "POST",
+      headers: headers,
+      body: this.enQuery(post_data),
+    };
+
+    const response = await fetch(url, requestOption);
+    return await response.json();
+  }
+
+  async fetch200(url, requestOption) {
+    let response;
+    for (let i = 0; i < 3; i++) {
+      response = await fetch(url, requestOption);
+      console.log(response.status);
+      if (response.status != 403) {
+        break;
+      }
+      await this.sleep(800 * (i + 1));
+    }
+    return response;
+  }
+
+  async requestOption(headers = {}, method = "GET") {
+    const accessToken = await this.accessToken();
+    headers["authorization"] = "Bearer " + accessToken;
+    return { method: method, headers: headers };
+  }
+
+  enQuery(data) {
+    const ret = [];
+    for (let d in data) {
+      ret.push(encodeURIComponent(d) + "=" + encodeURIComponent(data[d]));
+    }
+    return ret.join("&");
+  }
+
+  sleep(ms) {
+    return new Promise(function(resolve, reject) {
+      let i = 0;
+      setTimeout(function() {
+        console.log("sleep" + ms);
+        i++;
+        if (i >= 2) reject(new Error("i>=2"));
+        else resolve(i);
+      }, ms);
+    });
+  }
+}
+
+String.prototype.trim = function(char) {
+  if (char) {
+    return this.replace(
+      new RegExp("^\\" + char + "+|\\" + char + "+$", "g"),
+      ""
+    );
+  }
+  return this.replace(/^\s+|\s+$/g, "");
+};
